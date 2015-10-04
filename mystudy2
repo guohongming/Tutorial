@@ -1,0 +1,174 @@
+# 中国裁判文书网 > 四川省 > 成都市 > 民市案件
+# encoding = UTF-8
+
+import re
+import csv
+import random
+import time
+import urllib.request
+import socket
+import http.client
+
+
+# 获取网页中的html代码
+def get_content(url, data=None):
+    """ Get html that url assigned """
+
+    header = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, \
+like Gecko) Chrome/44.0.2403.130 Safari/537.36'}
+    req = urllib.request.Request(url, data, header)
+    timeout = random.choice(range(80, 180))
+    time.sleep(random.choice(range(0, 10)))
+    html = None
+
+    while True:
+        try:
+            response = urllib.request.urlopen(req, timeout=timeout)
+            html = response.read().decode('UTF-8', errors='ignore')
+            response.close()
+            break
+        except urllib.request.HTTPError as e:
+            print('1:', e)
+            time.sleep(random.choice(range(5, 10)))
+        except urllib.request.URLError as e:
+            print('2:', e)
+            time.sleep(random.choice(range(5, 10)))
+        except socket.timeout as e:
+            print('3:', e)
+            time.sleep(random.choice(range(8,15)))
+        except socket.error as e:
+            print('4:', e)
+            time.sleep(random.choice(range(20, 60)))
+        except http.client.BadStatusLine as e:
+            print('5:', e)
+            time.sleep(random.choice(range(30, 80)))
+        except http.client.IncompleteRead as e:
+            print('6:', e)
+            time.sleep(random.choice(range(5, 15)))
+
+    return html
+
+
+def get_url(html):
+    """ Get assigned url. """
+
+    cpr = '<div style="width:302px; z-index:-1;">\s*<a href="\.(.*?)" target="_blank" title="'
+    cps = re.compile(cpr, re.S)
+    cpt = re.findall(cps, html)
+
+    return cpt
+
+
+def locate_firstly(html):
+    """ Extract assigned information. """
+
+    final = []
+
+    r = re.compile('\s')
+    cpr_1 = '<td><div id="wsTitle">(.*?)</div></td>'
+    cps_1 = re.compile(cpr_1, re.S)
+    cpt_1 = re.findall(cps_1, html)
+    cp_1 = r.sub('', cpt_1[0])
+
+    cpr_2 = '<td><div id="wsTime"><span>提交时间：(.*?)</span><input name="PrintPage" type="button" id="PrintPage"\
+ value="打印预览" class="btn" />&nbsp;&nbsp;<input name="DownPDF" type="button" id="DownPDF" value="文书下载" class="btn" />'
+    cps_2 = re.compile(cpr_2, re.S)
+    cpt_2 = re.findall(cps_2, html)
+    cp_2 = r.sub('', cpt_2[0])
+
+    cpr = '(<DIV style="TEXT-ALIGN: left; FLOAT: left;font-size:20px;" id=DocArea>.*?</DIV>)\s*</DIV>'
+    cps = re.compile(cpr, re.S)
+    cpt = re.findall(cps, html)
+    if cpt == []:
+        cpr = '(<DIV style="TEXT-ALIGN: left; FLOAT: left;font-size:20px;" id=DocArea>.*)'
+        cps = re.compile(cpr, re.S)
+        cpt = re.findall(cps, html)
+    html = cpt[0]
+
+    cpr_3 = "<div style='TEXT-ALIGN: center; LINE-HEIGHT: 25pt; MARGIN: 0.5pt 0cm; FONT-FAMILY: 黑体; FONT-SIZE: 18pt;'>(.*?)</div>\
+<div style='TEXT-ALIGN: center; LINE-HEIGHT: 25pt; MARGIN: 0.5pt 0cm; FONT-FAMILY: 黑体; FONT-SIZE: 18pt;'>(.*?)</div>"
+    cps_3 = re.compile(cpr_3, re.S)
+    cpt_3 = re.findall(cps_3, html)
+
+    # 不为空则匹配有效
+    if cpt_3 != []:
+        cpr_4 = "<div style='TEXT-ALIGN: right; LINE-HEIGHT: 25pt; MARGIN: 0.5pt 0cm;  FONT-FAMILY: 宋体;FONT-SIZE: 15pt; '>(.*?)</div>"
+        cpr_6 = "<div style='LINE-HEIGHT: 25pt; TEXT-INDENT: 30pt; MARGIN: 0.5pt 0cm;FONT-FAMILY: 宋体; FONT-SIZE: 15pt;'>(.*)$"
+    else:
+        cpr_3 = '<DIV style="TEXT-ALIGN: left; FLOAT: left;font-size:20px;" id=DocArea>.*?<div style=".*?text-align: center.*?">(.*?)</div>\s+\
+<div style=".*?text-align: center.*?">(.*?)</div>'
+        cps_3 = re.compile(cpr_3, re.S+re.I)
+        cpt_3 = re.findall(cps_3, html)
+        if cpt_3 != []:
+            cpr_4 = '<div style=".*?text-align: center.*?">.*?</div>\s*<div style=".*?margin: 0.5pt 0cm;.*?">.*?</div>\s*\
+<div style=".*?margin: 0.5pt 0cm;.*?">(.*?)</div>'
+            cpr_6 ='<div style=".*?text-align: center.*?">.*?<div style=".*?text-indent:.*?">(.*)</div>'
+        else:
+            cpr_3 = '<DIV style="TEXT-ALIGN: left; FLOAT: left;font-size:20px;" id=DocArea>\s*(.*?)\s*?</DIV>'
+            cpt_3 = re.findall(cpr_3, html)
+            if cpt_3[0] == '文档内容为空' or cpt_3[0] == '':
+                if cpt_3[0] != '':
+                    cpr_6 = '文档内容为空'
+                else:
+                    cpr_6 = ''
+                cpt_3 = [('', '')]
+                cpr_4 = ''
+
+    cp_3 = r.sub('', cpt_3[0][0]+cpt_3[0][1])
+
+    cps_4 = re.compile(cpr_4, re.S+re.I)
+    cpt_4 = re.findall(cps_4, html)
+    cp_4 = r.sub('', cpt_4[0])
+
+    cp_5 = re.sub('[\n\t]', '', html)
+    cp_5 = re.sub('>\s*', '>', cp_5)
+    cp_5 = re.sub('\s*<', '<', cp_5)
+
+    cps_6 = re.compile(cpr_6, re.S+re.I)
+    cpt_6 = re.findall(cps_6, cp_5)
+    r = re.compile(r'<.+?>|\s|&nbsp')                # modify
+    cp_6 = r.sub('', cpt_6[0])[:1000] + '......'
+
+    final.extend((cp_1, cp_2, cp_3, cp_4, cp_5, cp_6))
+    return final
+
+
+def write_file(data):
+    """ Write the information into the file. """
+
+    with open('temporary.csv', 'a', errors='replace', newline='') as f:
+        f_csv = csv.writer(f)
+        f_csv.writerow(data)
+
+
+if __name__ == '__main__':
+    i = 0
+    count = 0
+    while i < 209:
+        print('第', i+1, '页开始写入文件', end=': ')
+        if i == 0:
+            url = 'http://www.court.gov.cn/zgcpwsw/sc/scscdszjrmfy/cdschqrmfy/ms/index.htm'
+        else:
+            url = 'http://www.court.gov.cn/zgcpwsw/sc/scscdszjrmfy/cdschqrmfy/ms/index_' + str(i) + '.htm'
+        html = get_content(url)
+        link = get_url(html)
+        for each in link:
+            e = 'http://www.court.gov.cn/zgcpwsw/sc/scscdszjrmfy/cdschqrmfy/ms' + each
+            html = get_content(e)
+
+            # 容错判断
+            cpt = re.findall('<td><div id="wsTitle">(.*?)</div></td>', html)
+            while not cpt:
+                html = get_content(e)
+                cpt = re.findall('<td><div id="wsTitle">(.*?)</div></td>', html)
+                print('cpt == None')
+
+            try:
+                info = locate_firstly(html)
+                write_file(info)
+                count += 1
+                print('第', count % 20 if count % 20 != 0 else 20, '条记录写入文件.', info[0])
+            except:
+                count += 1
+                print('第', count % 20 if count % 20 != 0 else 20, '写入不成功!!!', e)
+        i += 1
