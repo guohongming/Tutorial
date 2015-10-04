@@ -1,0 +1,146 @@
+__author__ = 'Guo'
+# -*- coding: utf-8 -*-
+import urllib
+import urllib2
+import time
+import socket
+import httplib
+import re
+import csv
+import sys
+
+reload(sys)
+sys.setdefaultencoding('utf-8')
+
+my_headers = {
+          'User-Agent':'Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/43.0.2357.124 Safari/537.36'
+           }
+
+
+def getContent(url,hders = my_headers,data = None):
+
+    tout = 15
+    content = None
+    while True:
+        try:
+            req = urllib2.Request(url,data,headers=hders)
+            html = urllib2.urlopen(req,timeout=tout)
+            content = html.read()
+            html.close()
+            break
+        except urllib2.URLError,e:
+            print e
+            time.sleep(10)
+        except socket.timeout,e:
+            print e
+            tout += 50
+            if(tout > 200):
+                break
+            time.sleep(5)
+        except socket.error,e:
+            print e
+            time.sleep(10)
+        except httplib.BadStatusLine,e:
+            print 'Get None Info'
+            time.sleep(60)
+        except ValueError,e:
+            print e
+            break
+    if content != None:
+        return content.decode('utf8')
+    else:
+        return None
+
+
+
+def getLinkIDs(url):
+    content = getContent(url)
+    link_p = '''<div style="width:302px; z-index:-1;">\s*<a href="./(.*?)" target="_blank" title'''
+    link_r = re.compile(link_p,re.S)
+    linkIDs = re.findall(link_r, content)
+    return linkIDs
+
+
+def data_select(data):
+
+    final = []
+    cpr_1 = '<td><div id="wsTitle">(.*?)</div></td>'
+    cps_1 = re.compile(cpr_1, re.S)
+    cpt_1 = re.findall(cps_1, data)
+
+    cpr_2 ='''<td><div id="wsTime"><span>.....(.*?)</span><in'''
+    cps_2 = re.compile(cpr_2,re.S)
+    cpt_2 = re.findall(cps_2,data)
+
+    cpr_3 = '''FONT-SIZE: 18pt;'>(.*?)</div><div style='TEXT-ALIGN: center; LINE-HEIGHT: 25pt; MARGIN: 0.5pt 0cm; FONT-FAMILY: ..; FONT-SIZE: 18pt;'>(.*?)</div><div style='TEXT-ALIGN: right'''
+    cps_3 = re.compile(cpr_3,re.S)
+    cpt_3 = re.findall(cps_3,data)
+    cpt_3_1 = re.sub('\s', '', cpt_3[0][1])
+
+
+    cpr_4 = '''FONT-SIZE: 15pt; '>(.*?)</div><div style='LINE-HEIGHT: 25pt; TEXT-INDENT: 30pt; MARGIN'''
+    cps_4 = re.compile(cpr_4,re.S)
+    cpt_4 = re.findall(cps_4,data)
+
+    cpr_5 = '(<DIV style="TEXT-ALIGN: left; FLOAT: left;font-size:20px;" id=DocArea> .*?</div></BODY></HTML></DIV>)'
+    cps_5 = re.compile(cpr_5,re.S)
+    cpt_5 = re.findall(cps_5,data)
+
+    cpt_6 = re.sub('<.+?>','',cpt_5[0])
+    cpt_6 = re.sub('\s','',cpt_6)[:1000]+'......'
+#    cpt_6 = re.sub('\n','',cpt_6)[:1000]+'......'
+#    print  cpt_6
+
+    final.append(cpt_1[0])
+    final.append(cpt_2[0])
+    final.append(cpt_3[0][0]+cpt_3_1)
+    final.append(cpt_4[0])
+    final.append(cpt_5[0])
+    final.append(cpt_6)
+
+    return final
+
+def info_save(data):
+    with open ('file_fin.csv', 'ab')as f:
+        f_writer = csv.writer(f)
+        f_writer.writerow(data)
+        f.close()
+
+def main():
+        count =0
+        temp = []
+        i =0
+        while i<119:
+            if i ==0 :
+                url1='http://www.court.gov.cn/zgcpwsw/sc/scscdszjrmfy/cdslqyqrmfy/ms/index.htm'
+            else:
+                url1='http://www.court.gov.cn/zgcpwsw/sc/scscdszjrmfy/cdslqyqrmfy/ms/index_'+str(i)+'.htm'
+            url_1 = 'http://www.court.gov.cn/zgcpwsw/sc/scscdszjrmfy/cdslqyqrmfy/ms/'
+
+            link_ids = getLinkIDs(url1)
+            for ids in link_ids:
+                try:
+                    print i
+                    print ids
+
+                    data = getContent(url_1+ids)
+                    data1 = data_select(data)
+                    info_save(data1)
+                except:
+                    print i
+                    print  'error' +';'+ids
+                    temp.append(ids)
+                    count = count+1
+                    continue
+            i=i+1
+        print 'error:'
+        print  count
+        print temp
+        with open ('file_fin_1.csv', 'ab')as g:
+            g_writer = csv.writer(g)
+            g_writer.writerow(temp)
+            g.close()
+
+
+if __name__ == '__main__':
+    main()
