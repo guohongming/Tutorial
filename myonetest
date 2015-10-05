@@ -1,0 +1,119 @@
+__author__ = 'Guo'
+__author__ = 'Guo'
+# -*- coding: utf-8 -*-
+import urllib
+import urllib2
+import time
+import socket
+import httplib
+import re
+import csv
+import sys
+
+reload(sys)
+sys.setdefaultencoding('utf-8')
+
+my_headers = {
+          'User-Agent':'Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/43.0.2357.124 Safari/537.36'
+           }
+
+
+def getContent(url,hders = my_headers,data = None):
+
+    tout = 15
+    content = None
+    while True:
+        try:
+            req = urllib2.Request(url,data,headers=hders)
+            html = urllib2.urlopen(req,timeout=tout)
+            content = html.read()
+            html.close()
+            break
+        except urllib2.URLError,e:
+            print e
+            time.sleep(10)
+        except socket.timeout,e:
+            print e
+            tout += 50
+            if(tout > 200):
+                break
+            time.sleep(5)
+        except socket.error,e:
+            print e
+            time.sleep(10)
+        except httplib.BadStatusLine,e:
+            print 'Get None Info'
+            time.sleep(60)
+        except ValueError,e:
+            print e
+            break
+    if content != None:
+        return content.decode('utf8')
+    else:
+        return None
+
+def data_select(data):
+
+    final = []
+    cpr_1 = '<td><div id="wsTitle">(.*?)</div></td>'
+    cps_1 = re.compile(cpr_1, re.S)
+    cpt_1 = re.findall(cps_1, data)
+
+    cpr_2 ='''<td><div id="wsTime"><span>.....(.*?)</span><in'''
+    cps_2 = re.compile(cpr_2,re.S)
+    cpt_2 = re.findall(cps_2,data)
+
+    cpr_3 = '''font-size: 18pt">\s*(.*?)</div>\s*<div style="text-align: center; line-height: 25pt; margin: 0.5pt 0cm; font-family: ..; font-size: 18pt">\s*(.*?)</div>'''
+    cps_3 = re.compile(cpr_3,re.S)
+    cpt_3 = re.findall(cps_3,data)
+    cpt_3_1 = re.sub('\s', '', cpt_3[0][1])
+
+
+    cpr_4 = '''div style="text-align: right; line-height: 25pt; margin: 0.5pt 0cm; font-family: ..; font-size: 15pt">\s*(.*?)</div>'''
+    cps_4 = re.compile(cpr_4,re.S)
+    cpt_4 = re.findall(cps_4,data)
+    cpt_4[0] = re.sub('\s','',cpt_4[0])
+
+    cp_5 = re.sub('[\n\t]', '', data)
+    cp_5 = re.sub('>\s*', '>', cp_5)
+    cp_5 = re.sub('\s*<', '<', cp_5)
+
+    print cp_5
+
+    cpr_5 = '(<DIV style="TEXT-ALIGN:.*?</div></DIV>)'
+    cps_5 = re.compile(cpr_5, re.S)
+    cpt_5 = re.findall(cps_5, cp_5)
+    print cpt_5[0]
+
+    cpr_6 = '<DIV style="TEXT-ALIGN.*?font-size: 18pt.*?</div><div style="line-height.*?font-size: 15pt">(.*?)</div></DIV>'
+    cps_6 = re.compile(cpr_6,re.S)
+    cpt_6 = re.findall(cps_6,cpt_5[0])
+
+    cpt_6 = re.sub('<.+?>','',cpt_6[0])
+    cpt_6 = re.sub('\s','',cpt_6)[:1000]+'......'
+    cpt_6 = re.sub('\n','',cpt_6)[:1000]+'......'
+#    print  cpt_6
+
+    final.append(cpt_1[0])
+    final.append(cpt_2[0])
+    final.append(cpt_3[0][0]+cpt_3_1)
+    final.append(cpt_4[0])
+    final.append(cpt_5[0])
+    final.append(cpt_6)
+
+    return final
+
+def info_save(data):
+        with open ('test_one.csv', 'ab')as f:
+            f_writer = csv.writer(f)
+            f_writer.writerow(data)
+
+
+def main():
+    url = 'http://www.court.gov.cn/zgcpwsw/sc/scscdszjrmfy/cdslqyqrmfy/ms/201508/t20150826_10463730.htm'
+    data = getContent(url)
+    data1 = data_select(data)
+    info_save(data1)
+
+if __name__ == '__main__':
+    main()
